@@ -1,0 +1,45 @@
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyo
+*.pyd
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Virtual environments
+venv/
+env/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Environment variables & secrets
+.env
+.env.*
+.streamlit/secrets.toml
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE & Editor settings
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Data directory (ignore large dataset CSVs, keep feature_importance)
+data/*.csv
+!data/feature_importance.csv
+
+# Temporary files & logs
+*.log
+*.tmp
+*.temp
+*.nbconvert.ipynb

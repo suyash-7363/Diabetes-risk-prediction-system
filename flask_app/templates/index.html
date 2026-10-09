@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🏥 Diabetes Risk Predictor</title>
+  <meta name="description" content="Early detection system — assess diabetes risk using an XGBoost model trained on 229,474 CDC survey respondents." />
+  <style>
+    /* ── Reset & base ───────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+    }
+
+    /* ── Layout ─────────────────────────────────────────────────── */
+    .layout {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      grid-template-rows: auto 1fr;
+      min-height: 100vh;
+    }
+
+    /* ── Top bar ────────────────────────────────────────────────── */
+    header {
+      grid-column: 1 / -1;
+      background: linear-gradient(135deg, #1a2035 0%, #1e3a5f 100%);
+      padding: 20px 32px;
+      border-bottom: 1px solid #2d3748;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    header .icon { font-size: 2rem; }
+    header h1 { font-size: 1.5rem; font-weight: 700; color: #63b3ed; }
+    header p  { font-size: 0.82rem; color: #a0aec0; margin-top: 2px; }
+    .badge {
+      margin-left: auto;
+      background: #2d3748;
+      border: 1px solid #4a5568;
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      color: #68d391;
+      white-space: nowrap;
+    }
+
+    /* ── Sidebar ─────────────────────────────────────────────────── */
+    aside {
+      background: #141821;
+      border-right: 1px solid #2d3748;
+      padding: 24px 20px;
+      overflow-y: auto;
+      max-height: calc(100vh - 80px);
+      position: sticky;
+      top: 0;
+    }
+    aside h2 {
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: #63b3ed;
+      margin-bottom: 16px;
+    }
+    .section-title {
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      color: #718096;
+      margin: 20px 0 8px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #2d3748;
+    }
+
+    /* Field wrapper */
+    .field { margin-bottom: 14px; }
+    .field label {
+      display: block;
+      font-size: 0.8rem;
+      color: #cbd5e0;
+      margin-bottom: 5px;
+    }
+
+    /* Toggle (bool) */
+    .toggle-wrap {
+      display: flex;
+      gap: 6px;
+    }
+    .toggle-wrap input[type="radio"] { display: none; }
+    .toggle-wrap label.opt {
+      flex: 1;
+      text-align: center;
+      padding: 6px 0;
+      border-radius: 6px;
+      border: 1px solid #4a5568;
+      background: #1a2035;
+      cursor: pointer;
+      font-size: 0.8rem;
+      color: #a0aec0;
+      transition: all .15s;
+    }
+    .toggle-wrap input[type="radio"]:checked + label.opt {
+      background: #2b6cb0;
+      border-color: #63b3ed;
+      color: #fff;
+    }
+
+    /* Slider */
+    .slider-row { display: flex; align-items: center; gap: 10px; }
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      flex: 1;
+      height: 4px;
+      background: #2d3748;
+      border-radius: 4px;
+      outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      background: #63b3ed;
+      cursor: pointer;
+    }
+    .slider-val {
+      min-width: 32px;
+      text-align: center;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #63b3ed;
+      background: #1a2035;
+      border: 1px solid #2d3748;
+      border-radius: 6px;
+      padding: 2px 6px;
+    }
+
+    /* Submit */
+    .btn-predict {
+      width: 100%;
+      margin-top: 20px;
+      padding: 13px;
+      background: linear-gradient(135deg, #2b6cb0, #2c7a7b);
+      border: none;
+      border-radius: 10px;
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity .2s;
+      letter-spacing: .02em;
+    }
+    .btn-predict:hover { opacity: .88; }
+
+    /* ── Main panel ──────────────────────────────────────────────── */
+    main {
+      padding: 28px 32px;
+      overflow-y: auto;
+    }
+
+    /* Placeholder */
+    .placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 80%;
+      color: #4a5568;
+      text-align: center;
+      gap: 12px;
+    }
+    .placeholder .big-icon { font-size: 5rem; }
+    .placeholder h2 { font-size: 1.2rem; color: #718096; }
+    .placeholder p  { font-size: 0.85rem; max-width: 340px; }
+
+    /* Result cards */
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .card {
+      background: #1a2035;
+      border: 1px solid #2d3748;
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .card .card-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: #718096;
+      margin-bottom: 6px;
+    }
+    .card .card-value {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: #e2e8f0;
+    }
+
+    /* Risk banner */
+    .risk-banner {
+      padding: 16px 20px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 24px;
+      border: 1px solid;
+    }
+    .risk-banner.low      { background: #1c3a2a; border-color: #276749; color: #68d391; }
+    .risk-banner.moderate { background: #3b2a10; border-color: #744210; color: #f6ad55; }
+    .risk-banner.high     { background: #3b1515; border-color: #742a2a; color: #fc8181; }
+    .risk-banner .emoji   { font-size: 1.6rem; }
+    .risk-banner .text    { flex: 1; }
+    .risk-banner .pct     { font-size: 1.4rem; font-weight: 800; }
+
+    /* Progress bar */
+    .bar-wrap {
+      background: #2d3748;
+      border-radius: 8px;
+      height: 14px;
+      overflow: hidden;
+      margin-bottom: 24px;
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 8px;
+      transition: width 0.4s ease;
+    }
+    .bar-fill.low      { background: linear-gradient(90deg, #276749, #68d391); }
+    .bar-fill.moderate { background: linear-gradient(90deg, #744210, #f6ad55); }
+    .bar-fill.high     { background: linear-gradient(90deg, #742a2a, #fc8181); }
+
+    /* Section heading */
+    .section-heading {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #90cdf4;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .divider {
+      border: none;
+      border-top: 1px solid #2d3748;
+      margin: 24px 0;
+    }
+
+    /* Summary table */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+    }
+    thead tr { background: #1a2035; }
+    thead th {
+      text-align: left;
+      padding: 8px 10px;
+      color: #63b3ed;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+    }
+    tbody tr:nth-child(odd)  { background: #141821; }
+    tbody tr:nth-child(even) { background: #1a2035; }
+    tbody td {
+      padding: 7px 10px;
+      color: #cbd5e0;
+      border-bottom: 1px solid #2d3748;
+    }
+    tbody td:last-child { text-align: right; color: #90cdf4; font-weight: 600; }
+
+    /* Footer */
+    footer {
+      grid-column: 1 / -1;
+      text-align: center;
+      font-size: 0.72rem;
+      color: #4a5568;
+      padding: 14px;
+      border-top: 1px solid #2d3748;
+    }
+    footer span { color: #718096; }
+  </style>
+</head>
+<body>
+
+<form method="POST" action="/">
+<div class="layout">
+
+  <!-- ── HEADER ──────────────────────────────────────────────────── -->
+  <header>
+    <span class="icon">🏥</span>
+    <div>
+      <h1>Diabetes Risk Prediction</h1>
+      <p>Early Detection System — XGBoost model · 229,474 CDC BRFSS 2015 respondents</p>
+    </div>
+    <div class="badge">ROC-AUC: 0.82 · Recall: 0.78</div>
+  </header>
+
+  <!-- ── SIDEBAR ─────────────────────────────────────────────────── -->
+  <aside>
+    <h2>🧾 Patient Details</h2>
+
+    <!-- Clinical -->
+    <div class="section-title">Clinical Indicators</div>
+    {% for feat in ["HighBP","HighChol","CholCheck","Stroke","HeartDiseaseorAttack"] %}
+    {% set meta = fields[feat] %}
+    <div class="field">
+      <label>{{ meta.label }}</label>
+      <div class="toggle-wrap">
+        <input type="radio" name="{{ feat }}" id="{{ feat }}_no" value="0"
+          {% if form_values[feat]|string == "0" %}checked{% endif %}>
+        <label class="opt" for="{{ feat }}_no">No</label>
+        <input type="radio" name="{{ feat }}" id="{{ feat }}_yes" value="1"
+          {% if form_values[feat]|string == "1" %}checked{% endif %}>
+        <label class="opt" for="{{ feat }}_yes">Yes</label>
+      </div>
+    </div>
+    {% endfor %}
+
+    <div class="field">
+      <label>BMI</label>
+      <div class="slider-row">
+        <input type="range" name="BMI" id="BMI"
+               min="10" max="80" value="{{ form_values['BMI'] }}"
+               oninput="document.getElementById('BMI_val').textContent=this.value">
+        <span class="slider-val" id="BMI_val">{{ form_values['BMI'] }}</span>
+      </div>
+    </div>
+
+    <!-- Lifestyle -->
+    <div class="section-title">Lifestyle Factors</div>
+    {% for feat in ["Smoker","PhysActivity","Fruits","Veggies","HvyAlcoholConsump"] %}
+    {% set meta = fields[feat] %}
+    <div class="field">
+      <label>{{ meta.label }}</label>
+      <div class="toggle-wrap">
+        <input type="radio" name="{{ feat }}" id="{{ feat }}_no" value="0"
+          {% if form_values[feat]|string == "0" %}checked{% endif %}>
+        <label class="opt" for="{{ feat }}_no">No</label>
+        <input type="radio" name="{{ feat }}" id="{{ feat }}_yes" value="1"
+          {% if form_values[feat]|string == "1" %}checked{% endif %}>
+        <label class="opt" for="{{ feat }}_yes">Yes</label>
+      </div>
+    </div>
+    {% endfor %}
+
+    <!-- Healthcare -->
+    <div class="section-title">Healthcare Access</div>
+    {% for feat in ["AnyHealthcare","NoDocbcCost"] %}
+    {% set meta = fields[feat] %}
+    <div class="field">
+      <label>{{ meta.label }}</label>
+      <div class="toggle-wrap">
+        <input type="radio" name="{{ feat }}" id="{{ feat }}_no" value="0"
+          {% if form_values[feat]|string == "0" %}checked{% endif %}>
+        <label class="opt" for="{{ feat }}_no">No</label>
+        <input type="radio" name="{{ feat }}" id="{{ feat }}_yes" value="1"
+          {% if form_values[feat]|string == "1" %}checked{% endif %}>
+        <label class="opt" for="{{ feat }}_yes">Yes</label>
+      </div>
+    </div>
+    {% endfor %}
+
+    <!-- General health -->
+    <div class="section-title">General Health</div>
+    {% for feat in ["DiffWalk"] %}
+    {% set meta = fields[feat] %}
+    <div class="field">
+      <label>{{ meta.label }}</label>
+      <div class="toggle-wrap">
+        <input type="radio" name="{{ feat }}" id="{{ feat }}_no" value="0"
+          {% if form_values[feat]|string == "0" %}checked{% endif %}>
+        <label class="opt" for="{{ feat }}_no">No</label>
+        <input type="radio" name="{{ feat }}" id="{{ feat }}_yes" value="1"
+          {% if form_values[feat]|string == "1" %}checked{% endif %}>
+        <label class="opt" for="{{ feat }}_yes">Yes</label>
+      </div>
+    </div>
+    {% endfor %}
+
+    {% for feat, label, vmin, vmax in [
+        ("GenHlth",  "General Health (1=Excellent, 5=Poor)",    1, 5),
+        ("MentHlth", "Poor Mental Health Days (last 30 days)",  0, 30),
+        ("PhysHlth", "Poor Physical Health Days (last 30 days)",0, 30)
+    ] %}
+    <div class="field">
+      <label>{{ label }}</label>
+      <div class="slider-row">
+        <input type="range" name="{{ feat }}" id="{{ feat }}"
+               min="{{ vmin }}" max="{{ vmax }}" value="{{ form_values[feat] }}"
+               oninput="document.getElementById('{{ feat }}_val').textContent=this.value">
+        <span class="slider-val" id="{{ feat }}_val">{{ form_values[feat] }}</span>
+      </div>
+    </div>
+    {% endfor %}
+
+    <!-- Demographics -->
+    <div class="section-title">Demographics</div>
+
+    <div class="field">
+      <label>Sex</label>
+      <div class="toggle-wrap">
+        <input type="radio" name="Sex" id="Sex_f" value="0"
+          {% if form_values['Sex']|string == "0" %}checked{% endif %}>
+        <label class="opt" for="Sex_f">Female</label>
+        <input type="radio" name="Sex" id="Sex_m" value="1"
+          {% if form_values['Sex']|string == "1" %}checked{% endif %}>
+        <label class="opt" for="Sex_m">Male</label>
+      </div>
+    </div>
+
+    {% for feat, label, vmin, vmax in [
+        ("Age",       "Age Group (1=18-24 → 13=80+)",       1, 13),
+        ("Education", "Education Level (1=None, 6=College)", 1, 6),
+        ("Income",    "Income Level (1=<$10K, 8=>$75K)",     1, 8)
+    ] %}
+    <div class="field">
+      <label>{{ label }}</label>
+      <div class="slider-row">
+        <input type="range" name="{{ feat }}" id="{{ feat }}"
+               min="{{ vmin }}" max="{{ vmax }}" value="{{ form_values[feat] }}"
+               oninput="document.getElementById('{{ feat }}_val').textContent=this.value">
+        <span class="slider-val" id="{{ feat }}_val">{{ form_values[feat] }}</span>
+      </div>
+    </div>
+    {% endfor %}
+
+    <button class="btn-predict" type="submit">⚡ Predict Risk</button>
+  </aside>
+
+  <!-- ── MAIN PANEL ──────────────────────────────────────────────── -->
+  <main>
+    {% if result %}
+
+      <!-- Score cards -->
+      <div class="cards">
+        <div class="card">
+          <div class="card-label">Diabetes Risk Score</div>
+          <div class="card-value">{{ result.prob_pct }}</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Risk Level</div>
+          <div class="card-value" style="font-size:1.2rem;">
+            {{ result.band.emoji }} {{ result.band.label }}
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-label">Prediction Confidence</div>
+          <div class="card-value">{{ result.confidence }}</div>
+        </div>
+      </div>
+
+      <!-- Risk banner -->
+      <div class="risk-banner {{ result.band.css }}">
+        <span class="emoji">{{ result.band.emoji }}</span>
+        <span class="text">{{ result.band.msg }} Probability: <strong>{{ result.prob_pct }}</strong></span>
+        <span class="pct">{{ result.prob_pct }}</span>
+      </div>
+
+      <!-- Progress bar -->
+      <div class="section-heading">📊 Risk Probability Bar</div>
+      <div class="bar-wrap">
+        <div class="bar-fill {{ result.band.css }}" style="width: {{ result.bar_width }}%;"></div>
+      </div>
+
+      <hr class="divider">
+
+      <!-- Patient summary -->
+      <div class="section-heading">📋 Patient Input Summary</div>
+      <div class="summary-grid">
+        <table>
+          <thead>
+            <tr><th>Feature</th><th>Value</th></tr>
+          </thead>
+          <tbody>
+            {% for row in result.summary[:11] %}
+            <tr>
+              <td>{{ row.label }}</td>
+              <td>{{ row.value }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <table>
+          <thead>
+            <tr><th>Feature</th><th>Value</th></tr>
+          </thead>
+          <tbody>
+            {% for row in result.summary[11:] %}
+            <tr>
+              <td>{{ row.label }}</td>
+              <td>{{ row.value }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <hr class="divider">
+      <p style="font-size:0.78rem; color:#718096;">
+        ⚠️ <strong>Disclaimer:</strong> This tool is for educational and portfolio demonstration purposes only.
+        It is not a substitute for professional medical advice, diagnosis, or treatment.
+      </p>
+
+    {% else %}
+      <!-- Empty state -->
+      <div class="placeholder">
+        <span class="big-icon">🩺</span>
+        <h2>No Prediction Yet</h2>
+        <p>Fill in the patient details on the left panel and click <strong>Predict Risk</strong> to see results.</p>
+      </div>
+    {% endif %}
+  </main>
+
+  <!-- ── FOOTER ──────────────────────────────────────────────────── -->
+  <footer>
+    <span>Model: XGBoost · Dataset: CDC BRFSS 2015 · ROC-AUC: 0.82 · Recall: 0.78 · Built by Cephas Adams Kumah</span>
+  </footer>
+
+</div>
+</form>
+
+</body>
+</html>
