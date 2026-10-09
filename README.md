@@ -2,7 +2,7 @@
 
 > An end-to-end clinical risk prediction web application using XGBoost and SHAP explainability, trained on 229,474 CDC survey respondents and deployed as an interactive Streamlit app.
 
-**🔗 Live App:** [Click here to try the app](https://diabetes-risk-predictor-fu3p3gcnxkeo2lfikvniapp.streamlit.app/)  
+**🔗 Live App:** [Click here to try the app](https://diabetes-risk-prediction-system-dhh5cfel4bcmxi94wxlea9.streamlit.app/)  
 
 
 ---
